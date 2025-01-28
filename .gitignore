@@ -8,6 +8,8 @@ testRZZ.cu
 **.d
 
 .venv
+*.def
+*.csv
 dmp.txt
 vir/
 MultiGPUWeighted.txt
