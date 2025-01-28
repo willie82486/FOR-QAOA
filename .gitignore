@@ -9,7 +9,7 @@ testRZZ.cu
 
 .venv
 *.def
-output.csv
+*.csv
 dmp.txt
 vir/
 MultiGPUWeighted.txt
