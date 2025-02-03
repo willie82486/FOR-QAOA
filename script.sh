@@ -2,11 +2,11 @@
 #SBATCH --account=GOV113123
 #SBATCH --partition=QUEUE
 #SBATCH -J QAOA_test
-#SBATCH --nodes=1
-#SBATCH --ntasks=8
+#SBATCH --nodes=2
+#SBATCH --ntasks=16
 #SBATCH --ntasks-per-node=8
 #SBATCH --cpus-per-task=8
-#SBATCH --gpus=8
+#SBATCH --gpus=16
 #SBATCH --gpus-per-task=1
 #SBATCH --gpus-per-node=8
 #SBATCH -o out_multi_node.log
@@ -27,5 +27,5 @@ export NCCL_IB_DISABLE=0
 export NCCL_IB_EXT=1
 export NCCL_SOCKET_IFNAME=ib0
 
-mpirun -np 8 -bind-to none --map-by ppr:8:node ./weighted 5 30 3 12 27
+mpirun -np 16 -bind-to none --map-by ppr:8:node ./weighted 5 30 4 12 26
 
