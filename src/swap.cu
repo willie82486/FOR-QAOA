@@ -302,14 +302,19 @@ void swap_gate_conti(const State& qureg, const int SwapOut, const int SwapIn, in
 
 		assert(counter == numSwapPairs);
 
+#if USE_MPI
+        checkCudaErrors(cudaMemcpyAsync(qureg.gpus->d_table, table, swap_table_size, cudaMemcpyHostToDevice, qureg.gpus->compute_stream));
+        // checkCudaErrors(cudaMemcpy(qureg.gpus->d_table, table, swap_table_size, cudaMemcpyHostToDevice));
+        _swap_gate_conti<<<grid, block, 0 ,qureg.gpus->compute_stream>>>(qureg.gpus->dState, SwapOut, SwapIn, numSwap, qureg.gpus->d_table);
 
+#else
         for (int dev = 0; dev < qureg.numDevice; dev++) {
             checkCudaErrors(cudaSetDevice(dev));
             checkCudaErrors(cudaMemcpyAsync(qureg.gpus[dev].d_table, table, swap_table_size, cudaMemcpyHostToDevice, qureg.gpus[dev].compute_stream));
             _swap_gate_conti<<<grid, block, 0 ,qureg.gpus[dev].compute_stream>>>(qureg.gpus[dev].dState, SwapOut, SwapIn, numSwap, qureg.gpus[dev].d_table);
             // checkCudaErrors(cudaFreeAsync(qureg.gpus[dev].d_table,qureg.gpus[dev].compute_stream));
         }
-
+#endif
 
 }
 
@@ -378,6 +383,22 @@ void CSQS(const State &qureg,  const int csqsSize, char* targ)
             for (int a = 0; a < (1 << csqsSize); a++)
             {
                 int devA = devlist[grp][a];
+#if USE_MPI
+                if(qureg.gpus->world_rank == devA){
+                    for (int b = 0; b < (1 << csqsSize); b++)
+                    {
+                        if (a == b)
+                            continue;
+                        int devB = devlist[grp][b];
+                        int off_sv = b * (1ull << (N - D - csqsSize)) + off;
+                        int off_bf = b * (1ull << (B - csqsSize));
+
+                        checkCudaErrors(ncclSend(qureg.gpus->dState + off_sv, (1 << (B - csqsSize)) * sizeof(Complex), ncclChar, devB, qureg.gpus->comm, qureg.gpus->compute_stream)); 
+                        checkCudaErrors(ncclRecv(qureg.gpus->dBuf + off_bf, (1 << (B - csqsSize)) * sizeof(Complex), ncclChar, devB, qureg.gpus->comm, qureg.gpus->compute_stream));
+                    }
+                }
+
+#else
                 // checkCudaErrors(ncclGroupStart());
                 for (int b = 0; b < (1 << csqsSize); b++)
                 {
@@ -386,9 +407,12 @@ void CSQS(const State &qureg,  const int csqsSize, char* targ)
                     int devB = devlist[grp][b];
                     int off_sv = b * (1ull << (N - D - csqsSize)) + off;
                     int off_bf = b * (1ull << (B - csqsSize));
+
                     checkCudaErrors(ncclSend(qureg.gpus[devA].dState + off_sv, (1 << (B - csqsSize)) * sizeof(Complex), ncclChar, devB, qureg.gpus[devA].comm, qureg.gpus[devA].compute_stream)); 
                     checkCudaErrors(ncclRecv(qureg.gpus[devA].dBuf + off_bf, (1 << (B - csqsSize)) * sizeof(Complex), ncclChar, devB, qureg.gpus[devA].comm, qureg.gpus[devA].compute_stream));
                 }
+
+#endif
                 // checkCudaErrors(ncclGroupEnd());
             }
             checkCudaErrors(ncclGroupEnd());
@@ -400,6 +424,20 @@ void CSQS(const State &qureg,  const int csqsSize, char* targ)
             for (int a = 0; a < (1 << csqsSize); a++)
             {
                 int devA = devlist[grp][a];
+#if USE_MPI
+                if(qureg.gpus->world_rank == devA){
+                    for (int b = 0; b < (1 << csqsSize); b++)
+                    {
+                        if (a == b)
+                            continue;
+                        int off_sv = b * (1ull << (N - D - csqsSize)) + off;
+                        int off_bf = b * (1ull << (B - csqsSize));
+                        checkCudaErrors(cudaMemcpyAsync(qureg.gpus->dState + off_sv, qureg.gpus->dBuf + off_bf, (1 << (B - csqsSize)) * sizeof(Complex), cudaMemcpyDeviceToDevice, qureg.gpus->compute_stream));
+                        // checkCudaErrors(cudaMemcpy(qureg.gpus->dState + off_sv, qureg.gpus->dBuf + off_bf, (1 << (B - csqsSize)) * sizeof(Complex), cudaMemcpyDeviceToDevice));
+                    }
+                }
+
+#else
                 // checkCudaErrors(ncclGroupStart());
                 for (int b = 0; b < (1 << csqsSize); b++)
                 {
@@ -409,6 +447,7 @@ void CSQS(const State &qureg,  const int csqsSize, char* targ)
                     int off_bf = b * (1ull << (B - csqsSize));
                     checkCudaErrors(cudaMemcpyAsync(qureg.gpus[devA].dState + off_sv, qureg.gpus[devA].dBuf + off_bf, (1 << (B - csqsSize)) * sizeof(Complex), cudaMemcpyDeviceToDevice, qureg.gpus[devA].compute_stream));
                 }
+#endif
                 // checkCudaErrors(ncclGroupEnd());
             }
             // checkCudaErrors(ncclGroupEnd());

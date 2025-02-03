@@ -2,6 +2,7 @@
 #define _STATE_H_
 
 #include <nccl.h>
+#define RANK_PER_NODE 8
 
 typedef double Fp;
 
@@ -23,7 +24,9 @@ typedef struct {
     void * stateHandle;
     void * bufHandle;
     int id;
-
+#if USE_MPI
+    int world_rank;
+#endif
     Fp* d_graph_1D;
     int *d_subcirs;
     int *d_table;
@@ -46,6 +49,7 @@ typedef struct State
 } State;
 
 // State createState(int numQubits, int numBufsPerDevice, ull numAmpsPerBuf);
+State createMPIState(int& N, int& D, int& B, int& C, int& world_rank, int& world_size);
 State createState(int N, int D, int B, int C);
 void destroyState(const State& state);
 

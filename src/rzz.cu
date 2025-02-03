@@ -165,9 +165,15 @@ void rotationCompressionWeighted(State& qureg,const Fp angle,const __restrict__ 
     Fp* graph_1d = UpperTri_to_1D(qureg.numQubits, graph);
     // Fp* d_graph_1D;
     size_t size = (qureg.numQubits * (qureg.numQubits-1))/2 * sizeof(Fp);
+
+#if USE_MPI
+    ull b_offset = qureg.gpus->id * qureg.numAmpsPerDevice;
+    checkCudaErrors(cudaMemcpyAsync(qureg.gpus->d_graph_1D, graph_1d, size, cudaMemcpyHostToDevice, qureg.gpus->compute_stream));
+    _rotationCompressionWeighted_conti<<<grid, block, 0, qureg.gpus->compute_stream>>>(qureg.gpus->dState, qureg.numQubits, b_offset, angle, qureg.gpus->d_graph_1D, isFirstLayer, initialAmp);
+#else
     for (int dev = 0; dev < qureg.numDevice; dev++) {
         ull b_offset = dev * qureg.numAmpsPerDevice;
-    
+
         checkCudaErrors(cudaSetDevice(dev));
         // checkCudaErrors(cudaMallocAsync(&qureg.gpus[dev].d_graph_1D, size, qureg.gpus[dev].compute_stream));
         // checkCudaErrors(cudaMemcpyAsync(d_graph_1D, graph_1d, size, cudaMemcpyHostToDevice, qureg.gpus[dev].compute_stream));
@@ -176,7 +182,7 @@ void rotationCompressionWeighted(State& qureg,const Fp angle,const __restrict__ 
         _rotationCompressionWeighted_conti<<<grid, block, 0, qureg.gpus[dev].compute_stream>>>(qureg.gpus[dev].dState, qureg.numQubits, b_offset, angle, qureg.gpus[dev].d_graph_1D, isFirstLayer, initialAmp);
     // checkCudaErrors(cudaFreeAsync(d_graph_1D, qureg.gpus[dev].compute_stream));
     }
-
+#endif
     // for (int dev = 0; dev < qureg.numDevice; dev++) {
     //     checkCudaErrors(cudaSetDevice(dev));
     //     checkCudaErrors(cudaDeviceSynchronize());

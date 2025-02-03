@@ -7,11 +7,69 @@
 #include "state.h"
 #include "helper_cuda.hpp"
 
+#if USE_MPI
+#include <mpi.h>
+#endif
+
+
+State createMPIState(int& N, int& D, int& B, int& C, int& world_rank, int& world_size) {
+    State qureg;
+    qureg.numQubits = N;
+
+    qureg.numDevice = 1 << D;
+    qureg.numQubitsPerDevice = N - D;
+    qureg.numAmpsPerDevice = 1ull << qureg.numQubitsPerDevice;
+    qureg.stateSizePerDevice = qureg.numAmpsPerDevice * sizeof(Complex);
+
+    qureg.numQubitsPerBuffer = B;
+    qureg.numAmpsPerBuf = 1ull << B;
+    qureg.bufSize = qureg.numAmpsPerBuf * sizeof(Complex);
+
+    qureg.gpus = (GPUState*) malloc(sizeof(GPUState));
+    memset(qureg.gpus, 0, sizeof(GPUState));
+
+    ncclUniqueId id;
+    if (world_rank == 0) {
+        checkCudaErrors(ncclGetUniqueId(&id));
+    }
+    MPI_Bcast((void*)&id, sizeof(id), MPI_BYTE, 0, MPI_COMM_WORLD);
+
+    int local_rank = world_rank % RANK_PER_NODE;
+    checkCudaErrors(cudaSetDevice(local_rank));
+    GPUState &gState = *qureg.gpus;
+    gState.id = local_rank;
+    gState.world_rank = world_rank;
+
+    ncclComm_t comm;
+    checkCudaErrors(ncclCommInitRank(&comm, world_size, id, world_rank));
+    gState.comm = comm;
+
+    
+    // checkCudaErrors(ncclMemAlloc((void **)&gState.dState, qureg.stateSizePerDevice));
+    // checkCudaErrors(ncclCommRegister(gState.comm, gState.dState, qureg.stateSizePerDevice, &gState.stateHandle));
+    // checkCudaErrors(ncclMemAlloc((void **)&gState.dBuf, qureg.bufSize));
+    // checkCudaErrors(ncclCommRegister(gState.comm, gState.dBuf, qureg.bufSize, &gState.bufHandle));
+    checkCudaErrors(cudaMalloc((void **)&gState.dState, qureg.stateSizePerDevice));
+    checkCudaErrors(cudaMalloc((void **)&gState.dBuf, qureg.bufSize));
+    // checkCudaErrors(cudaStreamCreateWithFlags(&gState.compute_stream, cudaStreamNonBlocking));
+    cudaStreamCreate(&(qureg.gpus->compute_stream));
 
 
 
+    ull stateSize = 1ull << qureg.numQubits;
 
-State createState(int N, int D, int B,int C) {
+    qureg.hState = (Complex*) calloc(stateSize, sizeof(Complex));
+    assert(qureg.hState);
+
+    // memset(qureg.hState, 0, stateSize);
+    qureg.hState[0].real = (Fp)1;
+    ncclWarnup(qureg);
+    stateInitDeviceState(qureg);
+    prepare(qureg, C);
+    return qureg;
+}
+
+State createState(int N, int D, int B, int C) {
     State qureg;
     qureg.numQubits = N;
 
@@ -43,10 +101,11 @@ State createState(int N, int D, int B,int C) {
         if (qureg.numDevice != 1 && qureg.bufSize )
         {
             gState.comm = comms[dev];
-            checkCudaErrors(ncclMemAlloc((void **)&gState.dState, qureg.stateSizePerDevice));
-            checkCudaErrors(ncclCommRegister(gState.comm, gState.dState, qureg.stateSizePerDevice, &gState.stateHandle));
-            checkCudaErrors(ncclMemAlloc((void **)&gState.dBuf, qureg.bufSize));
-            checkCudaErrors(ncclCommRegister(gState.comm, gState.dBuf, qureg.bufSize, &gState.bufHandle));
+            // remember to open these
+            // checkCudaErrors(ncclMemAlloc((void **)&gState.dState, qureg.stateSizePerDevice));
+            // checkCudaErrors(ncclCommRegister(gState.comm, gState.dState, qureg.stateSizePerDevice, &gState.stateHandle));
+            // checkCudaErrors(ncclMemAlloc((void **)&gState.dBuf, qureg.bufSize));
+            // checkCudaErrors(ncclCommRegister(gState.comm, gState.dBuf, qureg.bufSize, &gState.bufHandle));
         }
         else
         {
@@ -81,6 +140,19 @@ void prepare(State &qureg, int C){
     size_t size = (qureg.numQubits * (qureg.numQubits-1))/2 * sizeof(Fp);
 	ull numSwapPairs = (1ull<<C) * ((1ull<<C)-1) / 2;
     ull swap_table_size = numSwapPairs * 2 * sizeof(int);
+
+#if USE_MPI
+    //rzz
+    // checkCudaErrors(cudaMallocAsync(&qureg.gpus->d_graph_1D, size, qureg.gpus->compute_stream));
+    checkCudaErrors(cudaMalloc(&qureg.gpus->d_graph_1D, size));
+    //rx
+    // checkCudaErrors(cudaMallocAsync(&qureg.gpus->d_subcirs, C * sizeof(int), qureg.gpus->compute_stream));
+    checkCudaErrors(cudaMalloc(&qureg.gpus->d_subcirs, C * sizeof(int)));
+    //swap
+    // checkCudaErrors(cudaMallocAsync(&qureg.gpus->d_table, swap_table_size, qureg.gpus->compute_stream));
+    checkCudaErrors(cudaMalloc(&qureg.gpus->d_table, swap_table_size));
+
+#else
     for (int dev = 0; dev < qureg.numDevice; dev++) {
         checkCudaErrors(cudaSetDevice(dev));
         //rzz
@@ -95,11 +167,20 @@ void prepare(State &qureg, int C){
         checkCudaErrors(cudaSetDevice(dev));
         checkCudaErrors(cudaDeviceSynchronize());
     }
+#endif
     //rx
 }
 
 void stateInitDeviceState(const State& qureg) {   
     Complex one = {1, 0};
+
+#if USE_MPI
+    checkCudaErrors(cudaMemset(qureg.gpus->dState, 0, qureg.stateSizePerDevice));
+    if(qureg.gpus->world_rank == 0){
+        checkCudaErrors(cudaMemcpyAsync(qureg.gpus->dState, &one, sizeof(one), cudaMemcpyHostToDevice));
+        // checkCudaErrors(cudaMemcpy(qureg.gpus->dState, &one, sizeof(one), cudaMemcpyHostToDevice));
+    }
+#else
     for (int dev = 0; dev < qureg.numDevice; dev++) {
         checkCudaErrors(cudaSetDevice(dev));
         checkCudaErrors(cudaMemset(qureg.gpus[dev].dState, 0, qureg.stateSizePerDevice));
@@ -110,6 +191,7 @@ void stateInitDeviceState(const State& qureg) {
         checkCudaErrors(cudaSetDevice(dev));
         checkCudaErrors(cudaDeviceSynchronize());
     }
+#endif
 }
 
 
@@ -131,12 +213,29 @@ void ncclWarnup(State &qureg) {
 
     for (ull off = 0; off < (1ull << (N - D - csqsSize)); off += (1 << (B - csqsSize)))
     {
+        // printf("Hello1\n");
         for (int grp = 0; grp < (1 << (D - csqsSize)); grp++)
         {
             checkCudaErrors(ncclGroupStart());
             for (int a = 0; a < (1 << csqsSize); a++)
             {
                 int devA = devlist[grp][a];
+#if USE_MPI
+                if(qureg.gpus->world_rank == devA){
+                    for (int b = 0; b < (1 << csqsSize); b++)
+                    {
+                        if (a == b)
+                            continue;
+                        int devB = devlist[grp][b];
+                        int off_sv = b * (1ull << (N - D - csqsSize)) + off;
+                        int off_bf = b * (1ull << (B - csqsSize));
+
+                        checkCudaErrors(ncclSend(qureg.gpus->dState + off_sv, (1 << (B - csqsSize)) * sizeof(Complex), ncclChar, devB, qureg.gpus->comm, qureg.gpus->compute_stream)); 
+                        checkCudaErrors(ncclRecv(qureg.gpus->dBuf + off_bf, (1 << (B - csqsSize)) * sizeof(Complex), ncclChar, devB, qureg.gpus->comm, qureg.gpus->compute_stream));
+                    }
+                }
+
+#else
                 // checkCudaErrors(ncclGroupStart());
                 for (int b = 0; b < (1 << csqsSize); b++)
                 {
@@ -145,28 +244,37 @@ void ncclWarnup(State &qureg) {
                     int devB = devlist[grp][b];
                     int off_sv = b * (1ull << (N - D - csqsSize)) + off;
                     int off_bf = b * (1ull << (B - csqsSize));
-                    checkCudaErrors(ncclSend(qureg.gpus[devA].dState + off_sv, (1 << (B - csqsSize)) * sizeof(Complex), ncclChar, devB, qureg.gpus[devA].comm, qureg.gpus[devA].compute_stream));
+
+                    checkCudaErrors(ncclSend(qureg.gpus[devA].dState + off_sv, (1 << (B - csqsSize)) * sizeof(Complex), ncclChar, devB, qureg.gpus[devA].comm, qureg.gpus[devA].compute_stream)); 
                     checkCudaErrors(ncclRecv(qureg.gpus[devA].dBuf + off_bf, (1 << (B - csqsSize)) * sizeof(Complex), ncclChar, devB, qureg.gpus[devA].comm, qureg.gpus[devA].compute_stream));
                 }
+
+#endif
                 // checkCudaErrors(ncclGroupEnd());
             }
             checkCudaErrors(ncclGroupEnd());
         }
-        for (int dev = 0; dev < qureg.numDevice; dev++) {
-            checkCudaErrors(cudaSetDevice(dev));
-            checkCudaErrors(cudaDeviceSynchronize());
-        } 
-
-
-        for (int dev = 0; dev < qureg.numDevice; dev++) {
-            checkCudaErrors(cudaSetDevice(dev));
-            checkCudaErrors(cudaDeviceSynchronize());
-        }  
+        // printf("Hello2\n");
         for (int grp = 0; grp < (1 << (D - csqsSize)); grp++)
         {
+            // checkCudaErrors(ncclGroupStart());
             for (int a = 0; a < (1 << csqsSize); a++)
             {
                 int devA = devlist[grp][a];
+#if USE_MPI
+                if(qureg.gpus->world_rank == devA){
+                    for (int b = 0; b < (1 << csqsSize); b++)
+                    {
+                        if (a == b)
+                            continue;
+                        int off_sv = b * (1ull << (N - D - csqsSize)) + off;
+                        int off_bf = b * (1ull << (B - csqsSize));
+                        checkCudaErrors(cudaMemcpyAsync(qureg.gpus->dState + off_sv, qureg.gpus->dBuf + off_bf, (1 << (B - csqsSize)) * sizeof(Complex), cudaMemcpyDeviceToDevice, qureg.gpus->compute_stream));
+                        // checkCudaErrors(cudaMemcpy(qureg.gpus->dState + off_sv, qureg.gpus->dBuf + off_bf, (1 << (B - csqsSize)) * sizeof(Complex), cudaMemcpyDeviceToDevice));
+                    }
+                }
+
+#else
                 // checkCudaErrors(ncclGroupStart());
                 for (int b = 0; b < (1 << csqsSize); b++)
                 {
@@ -176,12 +284,15 @@ void ncclWarnup(State &qureg) {
                     int off_bf = b * (1ull << (B - csqsSize));
                     checkCudaErrors(cudaMemcpyAsync(qureg.gpus[devA].dState + off_sv, qureg.gpus[devA].dBuf + off_bf, (1 << (B - csqsSize)) * sizeof(Complex), cudaMemcpyDeviceToDevice, qureg.gpus[devA].compute_stream));
                 }
+#endif
                 // checkCudaErrors(ncclGroupEnd());
             }
+            // checkCudaErrors(ncclGroupEnd());
         }
 
         break;
     }
+
 }
 
 void stateCpyDeviceToHost(const State& qureg) {

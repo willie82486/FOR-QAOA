@@ -130,7 +130,19 @@ void multiRotateX(State& qureg, vector<int> &targetQubits,const int gate_size,co
         const int grid = qureg.numAmpsPerDevice / chunk_size;
         const int unroll = 8;
         const int thread = chunk_size / unroll;
-        
+#if USE_MPI
+        checkCudaErrors(cudaMemcpyAsync(qureg.gpus->d_subcirs, 
+                                        targetQubits.data(),
+                                        gate_size * sizeof(int), 
+                                        cudaMemcpyHostToDevice,
+                                        qureg.gpus->compute_stream));
+        // checkCudaErrors(cudaMemcpy(qureg.gpus->d_subcirs, 
+        //                                 targetQubits.data(),
+        //                                 gate_size * sizeof(int), 
+        //                                 cudaMemcpyHostToDevice)); 
+        _multirotateX_unroll<unroll, thread><<<grid, thread, 0, qureg.gpus->compute_stream>>>(qureg.gpus->dState, cosTheta_2, sinTheta_2, qureg.gpus->d_subcirs, gate_size);
+
+#else
         for (int dev = 0; dev < qureg.numDevice; dev++) {
             checkCudaErrors(cudaSetDevice(dev));
             checkCudaErrors(cudaMemcpyAsync(qureg.gpus[dev].d_subcirs, 
@@ -141,7 +153,7 @@ void multiRotateX(State& qureg, vector<int> &targetQubits,const int gate_size,co
             // _multirotateX<<<grid, block, 0, qureg.gpus[dev].compute_stream>>>(qureg.gpus[dev].dState, cosTheta_2, sinTheta_2, qureg.gpus[dev].d_subcirs, gate_size);
             _multirotateX_unroll<unroll, thread><<<grid, thread, 0, qureg.gpus[dev].compute_stream>>>(qureg.gpus[dev].dState, cosTheta_2, sinTheta_2, qureg.gpus[dev].d_subcirs, gate_size);
         }
-
+#endif
         return;
     }
     std::cout << "Jump out of if" << std::endl;
