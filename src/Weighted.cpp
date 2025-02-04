@@ -35,7 +35,7 @@ int main(int argc, char* argv[])
     int D;  // number of devices
     int C;  // chunk size
     int B;  // number of amps per buffer
-    // printf("argc = %d", argc);
+
     if (argc >= 2) {
         P = atoi(argv[1]);
         N = atoi(argv[2]);
@@ -50,14 +50,6 @@ int main(int argc, char* argv[])
         C = 10;
         B = 19;
     }
-    // cout << P << " ";
-    // cout << N << " ";
-    // cout << C << " ";
-    // cout << A << endl;
-    // printf("%6s, %15s, %22s\n", "qubits", "time (us)", "stateVector[0]");
-
-    // for (int num_qubits = 2; num_qubits <= 30; num_qubits++) {
-    // cout << P << "," << N << "," << D << "," << C << "," << B;
 
 #if USE_MPI
     State qureg = createMPIState(N, D, B, C, world_rank, world_size);
@@ -68,14 +60,17 @@ int main(int argc, char* argv[])
 #endif
 
     Fp* graph = init2DGraph(qureg);
-    
+
+    // ==========================================================
     // fully connected graph
+    // ==========================================================
     for (int i=0; i<N; i++)
         for (int j=i+1; j<N; j++)
             addEdgeTo2DGraph(qureg, graph, i, j, 1.f);    // add edge that connects node i and node j
 
-
+    // ==========================================================
     // Initialize for Launch control
+    // ==========================================================
     initH(qureg);
     // ==========================================================
     // Initialize Subcircuits.
@@ -93,9 +88,6 @@ int main(int argc, char* argv[])
         subcirs.push_back(qubitIdx_in_current_subcir);
     }
 
-    // vector<vector<int>> subcirs = {{0, }};
-    // num_subcir += 1;
-
     // ==========================================================
     // Start implementation.
     // ==========================================================
@@ -106,30 +98,18 @@ int main(int argc, char* argv[])
         // RZZ Gate.
         // =======================================================
         rotationCompressionWeighted(qureg, GAMMA, graph, p==0);
-        
-        // std::cout << "Tot num_subcir = " << num_subcir << endl;
+
         int swapIn_index = 0;
         for(int i = 0; i < num_subcir; i++) {
-            // cout << "num_subcir = " << i << endl; 
-            // for (auto &q : subcirs[i])
-            //     q %= chunk_size;
             // ===================================================
             // RX Gate.
             // ===================================================
-            // printf("i = %d \n", i);
             multiRotateX(qureg, subcirs[0], subcirs[i].size(), BETA);
-            // ===================================================
-            // Recovering.
-            // ===================================================
-            // if( i > 0 ){
-            //     swap_gate_conti(qureg, 0, swapIn_index, subcirs[i].size());
-            //     // mapping_after_swap_conti(qureg, graph, 0, swapIn_index, subcirs[i].size());
-            // }
+
             // ===================================================
             // Swap in chunk.
             // ===================================================
             if( i < num_subcir-1 ){
-                // cout << "swap = " << i << " & " << i+1 << endl;
                 swapIn_index += subcirs[i].size();
                 swap_gate_conti(qureg, 0, swapIn_index, subcirs[i+1].size());
                 mapping_after_swap_conti(qureg, graph, 0, swapIn_index, subcirs[i+1].size());
@@ -141,8 +121,7 @@ int main(int argc, char* argv[])
     // ==========================================================
     // Synchronize.
     // ==========================================================
-#if USE_MPI
-#else
+#ifndef USE_MPI
     for (int dev = 0; dev < qureg.numDevice; dev++) {
         checkCudaErrors(cudaSetDevice(dev));
         checkCudaErrors(cudaDeviceSynchronize());

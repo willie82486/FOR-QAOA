@@ -44,14 +44,8 @@ State createMPIState(int& N, int& D, int& B, int& C, int& world_rank, int& world
     checkCudaErrors(ncclCommInitRank(&comm, world_size, id, world_rank));
     gState.comm = comm;
 
-    
-    // checkCudaErrors(ncclMemAlloc((void **)&gState.dState, qureg.stateSizePerDevice));
-    // checkCudaErrors(ncclCommRegister(gState.comm, gState.dState, qureg.stateSizePerDevice, &gState.stateHandle));
-    // checkCudaErrors(ncclMemAlloc((void **)&gState.dBuf, qureg.bufSize));
-    // checkCudaErrors(ncclCommRegister(gState.comm, gState.dBuf, qureg.bufSize, &gState.bufHandle));
     checkCudaErrors(cudaMalloc((void **)&gState.dState, qureg.stateSizePerDevice));
     checkCudaErrors(cudaMalloc((void **)&gState.dBuf, qureg.bufSize));
-    // checkCudaErrors(cudaStreamCreateWithFlags(&gState.compute_stream, cudaStreamNonBlocking));
     cudaStreamCreate(&(qureg.gpus->compute_stream));
 
 
@@ -61,7 +55,6 @@ State createMPIState(int& N, int& D, int& B, int& C, int& world_rank, int& world
     qureg.hState = (Complex*) calloc(stateSize, sizeof(Complex));
     assert(qureg.hState);
 
-    // memset(qureg.hState, 0, stateSize);
     qureg.hState[0].real = (Fp)1;
     ncclWarnup(qureg);
     stateInitDeviceState(qureg);
@@ -121,13 +114,11 @@ State createState(int N, int D, int B, int C) {
     //     }
     // }
 
-    // ull stateSize = qureg.numDevice * qureg.stateSizePerDevice;
     ull stateSize = 1ull << qureg.numQubits;
 
     qureg.hState = (Complex*) calloc(stateSize, sizeof(Complex));
     assert(qureg.hState);
 
-    // memset(qureg.hState, 0, stateSize);
     qureg.hState[0].real = (Fp)1;
     ncclWarnup(qureg);
     stateInitDeviceState(qureg);
@@ -213,7 +204,6 @@ void ncclWarnup(State &qureg) {
 
     for (ull off = 0; off < (1ull << (N - D - csqsSize)); off += (1 << (B - csqsSize)))
     {
-        // printf("Hello1\n");
         for (int grp = 0; grp < (1 << (D - csqsSize)); grp++)
         {
             checkCudaErrors(ncclGroupStart());
@@ -254,7 +244,6 @@ void ncclWarnup(State &qureg) {
             }
             checkCudaErrors(ncclGroupEnd());
         }
-        // printf("Hello2\n");
         for (int grp = 0; grp < (1 << (D - csqsSize)); grp++)
         {
             // checkCudaErrors(ncclGroupStart());

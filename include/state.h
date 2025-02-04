@@ -48,7 +48,6 @@ typedef struct State
     GPUState *gpus;
 } State;
 
-// State createState(int numQubits, int numBufsPerDevice, ull numAmpsPerBuf);
 State createMPIState(int& N, int& D, int& B, int& C, int& world_rank, int& world_size);
 State createState(int N, int D, int B, int C);
 void destroyState(const State& state);

@@ -15,10 +15,6 @@ void mapping_after_swap_conti(const State& qureg, Fp* graph,const int SwapOut,co
     int base_In = SwapIn * num;
     int interval = SwapIn - SwapOut - numSwap ;
 
-    // int Out = base_Out + SwapOut + numSwap;
-    // int In = base_Out + numSwap * num + SwapIn;
-    // int start = base_Out + SwapIn ;
- 
     //targ 0 of RZZ belongs to SwapOut and targ1 belongs to SwapIn
     for(int i = 0; i< SwapOut; i++)
     {
@@ -88,10 +84,6 @@ void mapping_after_swap_conti(const State& qureg, ull* graph,const int SwapOut,c
     int base_Out = SwapOut * num;
     int base_In = SwapIn * num;
     int interval = SwapIn - SwapOut - numSwap ;
-
-    // int Out = base_Out + SwapOut + numSwap;
-    // int In = base_Out + numSwap * num + SwapIn;
-    // int start = base_Out + SwapIn ;
  
     //targ 0 of RZZ belongs to SwapOut and targ1 belongs to SwapIn
     for(int i = 0; i< SwapOut; i++)
@@ -210,7 +202,6 @@ void swap_gate(const State& qureg,const int targ0,const int targ1){
             checkCudaErrors(cudaSetDevice(dev));
             _swap_gate<<<grid, block>>>(qureg.gpus[dev].dState, targ0, targ1);
         }
-        // cout << "qureg.numDevice = " << qureg.numDevice << endl;
         for (int dev = 0; dev < qureg.numDevice; dev++) {
             checkCudaErrors(cudaSetDevice(dev));
             checkCudaErrors(cudaDeviceSynchronize());
@@ -354,10 +345,7 @@ void CSQS(const State &qureg,  const int csqsSize, char* targ)
             mem_bits |= ((mbr >> i) & 1) << targ[i];
         devlist[0][mbr] = mem_bits;
     }
-    // char sorted_targs[csqsSize];
-    // for (int i = 0; i < csqsSize; i++)
-    //     sorted_targs[i] = targ[i];
-    // std::sort(sorted_targs, sorted_targs + csqsSize);
+   
     for (int grp = 1; grp < (numGroups); grp++)
     {
         int grp_bits = grp;
@@ -367,16 +355,10 @@ void CSQS(const State &qureg,  const int csqsSize, char* targ)
             devlist[grp][mbr] = grp_bits | devlist[0][mbr];
     }
 
-    // for (int grp = 0; grp < numGroups; grp++) {
-    //     for (int mbr = 0; mbr < numMemberInGroup; mbr++) {
-    //         cerr << grp << " " << mbr << " " << endl;
-    //     }
-    // }
-    
+ 
     // Using buffer to tackle ncclSend and ncclRecv
     for (ull off = 0; off < (1ull << (N - D - csqsSize)); off += (1 << (B - csqsSize)))
     {
-        // printf("Hello1\n");
         for (int grp = 0; grp < (1 << (D - csqsSize)); grp++)
         {
             checkCudaErrors(ncclGroupStart());
@@ -417,7 +399,7 @@ void CSQS(const State &qureg,  const int csqsSize, char* targ)
             }
             checkCudaErrors(ncclGroupEnd());
         }
-        // printf("Hello2\n");
+
         for (int grp = 0; grp < (1 << (D - csqsSize)); grp++)
         {
             // checkCudaErrors(ncclGroupStart());

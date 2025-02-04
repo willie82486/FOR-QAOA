@@ -50,8 +50,6 @@ __global__ void _multirotateX_unroll(Complex * __restrict__ sv,const Fp cosTheta
 		Complex q = sv[gidx + tidx];
 		sharedBuffer[tidx].real = q.real;
 		sharedBuffer[tidx].imag = q.imag;
-		// sharedBuffer.reals[tidx] = q.real;
-		// sharedBuffer.imags[tidx] = q.imag;
 	}
 	__syncthreads();
 
@@ -66,8 +64,6 @@ __global__ void _multirotateX_unroll(Complex * __restrict__ sv,const Fp cosTheta
 		Complex q;
 		q.real = sharedBuffer[tidx].real;
 		q.imag = sharedBuffer[tidx].imag;
-		// q.real = sharedBuffer.reals[tidx];
-		// q.imag = sharedBuffer.imags[tidx];
 		sv[gidx + tidx] = q;
 	}
     // cudafree(sharedBuffer);
@@ -83,13 +79,6 @@ __inline__ __device__ void rx_gate(Complex* sv,const int target,const Fp cosThet
 
     Complex up = sv[up_off];
     Complex lo = sv[lo_off];
-
-    // double coeff = 1/sqrt(2);
-    // sv[up_off].real = coeff * (up.real + lo.real);
-	// sv[up_off].imag = coeff * (up.imag + lo.imag);
-	// sv[lo_off].real = coeff * (up.real - lo.real);
-	// sv[lo_off].imag = coeff * (up.imag - lo.imag);
-
 
     sv[up_off].real =   up.real * cosTheta_2 + lo.imag * sinTheta_2;
     sv[up_off].imag =   up.imag * cosTheta_2 - lo.real * sinTheta_2;
@@ -115,17 +104,6 @@ void multiRotateX(State& qureg, vector<int> &targetQubits,const int gate_size,co
     // target qubit is not the most significant bit
     // if (targetQubit < qureg.numQubitsPerDevice)
     if (targetQubits[gate_size-1] < qureg.numQubitsPerDevice){
-        /*
-        ull grid = 1;
-        ull block = qureg.numAmpsPerDevice >> 1;
-
-        if (block > 1024) {                  
-            grid = block / 1024;
-            block = 1024;
-        }
-        */
-        // cout<<"grid = "<< grid << "block = " << block << endl;
-
         const int chunk_size = 1 << CHUNK_QUBIT;
         const int grid = qureg.numAmpsPerDevice / chunk_size;
         const int unroll = 8;
@@ -150,7 +128,6 @@ void multiRotateX(State& qureg, vector<int> &targetQubits,const int gate_size,co
                                             gate_size * sizeof(int), 
                                             cudaMemcpyHostToDevice,
                                             qureg.gpus[dev].compute_stream));
-            // _multirotateX<<<grid, block, 0, qureg.gpus[dev].compute_stream>>>(qureg.gpus[dev].dState, cosTheta_2, sinTheta_2, qureg.gpus[dev].d_subcirs, gate_size);
             _multirotateX_unroll<unroll, thread><<<grid, thread, 0, qureg.gpus[dev].compute_stream>>>(qureg.gpus[dev].dState, cosTheta_2, sinTheta_2, qureg.gpus[dev].d_subcirs, gate_size);
         }
 #endif
