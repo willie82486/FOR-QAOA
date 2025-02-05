@@ -12,6 +12,7 @@ D_LINK = obj/dlink.o
 CXXFLAGS = -DCHUNK_QUBIT=$(CHUNK_QUBIT) -DUSE_MPI -O3
 NVCXXFLAGS = -arch=sm_90 -maxrregcount=64 -Xcompiler -fopenmp
 LDFLAGS = -lnccl -lcudart -lmpi
+
 CXXFLAGS += -I$(MPI_HOME)include
 LDFLAGS += -L$(MPI_HOME)lib -L$(MPI_HOME)lib64
 
