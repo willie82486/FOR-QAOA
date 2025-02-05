@@ -44,8 +44,14 @@ State createMPIState(int& N, int& D, int& B, int& C, int& world_rank, int& world
     checkCudaErrors(ncclCommInitRank(&comm, world_size, id, world_rank));
     gState.comm = comm;
 
-    checkCudaErrors(cudaMalloc((void **)&gState.dState, qureg.stateSizePerDevice));
-    checkCudaErrors(cudaMalloc((void **)&gState.dBuf, qureg.bufSize));
+    // if NCCL_VERSION >= (2,19,0)
+    // checkCudaErrors(ncclMemAlloc((void **)&gState.dState, qureg.stateSizePerDevice));
+    // checkCudaErrors(ncclCommRegister(gState.comm, gState.dState, qureg.stateSizePerDevice, &gState.stateHandle));
+    // checkCudaErrors(ncclMemAlloc((void **)&gState.dBuf, qureg.bufSize));
+    // checkCudaErrors(ncclCommRegister(gState.comm, gState.dBuf, qureg.bufSize, &gState.bufHandle));
+    // else
+    checkCudaErrors(cudaMalloc((void**)&gState.dState, qureg.stateSizePerDevice));
+    checkCudaErrors(cudaMalloc((void**)&gState.dBuf, qureg.bufSize));
     cudaStreamCreate(&(qureg.gpus->compute_stream));
 
 
@@ -99,6 +105,14 @@ State createState(int N, int D, int B, int C) {
             // checkCudaErrors(ncclCommRegister(gState.comm, gState.dState, qureg.stateSizePerDevice, &gState.stateHandle));
             // checkCudaErrors(ncclMemAlloc((void **)&gState.dBuf, qureg.bufSize));
             // checkCudaErrors(ncclCommRegister(gState.comm, gState.dBuf, qureg.bufSize, &gState.bufHandle));
+	    // if NCCL_VERSION >= (2,19,0)
+	    checkCudaErrors(ncclMemAlloc((void **)&gState.dState, qureg.stateSizePerDevice));
+	    checkCudaErrors(ncclCommRegister(gState.comm, gState.dState, qureg.stateSizePerDevice, &gState.stateHandle));
+	    checkCudaErrors(ncclMemAlloc((void **)&gState.dBuf, qureg.bufSize));
+	    checkCudaErrors(ncclCommRegister(gState.comm, gState.dBuf, qureg.bufSize, &gState.bufHandle));
+	    // else
+	    // checkCudaErrors(cudaMalloc((void**)&gState.dState, qureg.stateSizePerDevice));
+	    // checkCudaErrors(cudaMalloc((void**)&gState.dBuf, qureg.bufSize));
         }
         else
         {
