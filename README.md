@@ -5,3 +5,7 @@ Simulate the Quantum Approximate Optimization Algorithm (QAOA) on a classical co
 
 1. Clone this repository and navigate to the corresponding directory.
 
+2. Compile
+```
+make
+```
