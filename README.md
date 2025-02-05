@@ -9,6 +9,9 @@ Simulate the Quantum Approximate Optimization Algorithm (QAOA) on a classical co
 ```bash
 make
 ```
+In the `makefile`,
+* the `-arch` flag in `NVCXXFLAGS` may need to be modified based on the GPU you are using.
+  
 ### 3. Execute ./weighted to run the program. The output will display the elapsed time based on the parameters provided.
 ```bash
 ./weighted P N D C B
