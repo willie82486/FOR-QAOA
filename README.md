@@ -1,4 +1,4 @@
-# FOR-QAOA_GPU
+# FOR-QAOA: Fully Optimized Resource-Efficient QAOA Circuit Simulation
 **FOR-QAOA** is a high-performance quantum circuit simulator specifically designed for simulating the Quantum Approximate Optimization Algorithm (QAOA), targeting large-scale combinatorial optimization problems such as Max-Cut. This simulator achieves up to **1490× GPU speedup** and **24× CPU speedup** compared to existing state-of-the-art quantum simulators.
 
 **FOR-QAOA** efficiently runs on **multi-node CPUs** and **multi-device GPUs**, enabling scalable, high-fidelity quantum circuit simulations.
