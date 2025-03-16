@@ -71,7 +71,7 @@ The following method push the algorithm to be compute bound.
 ## 📈 Performance
 Tested on:
 - **8× DGX-H100 servers (64 GPUs total) for GPU scalability**
-- **8× multi-node CPU clusters (Intel Xeon Platinum 8352V / 8480+)**\
+- **8× multi-node CPU clusters (Intel Xeon Platinum 8352V / 8480+)**
 
 ✅ Outperforms Qiskit-Aer, cuQuantum, mpiQulacs, QuEST, and UniQ\
 ✅ Scales efficiently up to 64 GPUs and 8 CPU nodes\
