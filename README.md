@@ -75,7 +75,7 @@ Tested on:
 
 ✅ Outperforms Qiskit-Aer, cuQuantum, mpiQulacs, QuEST, and UniQ\
 ✅ Scales efficiently up to 64 GPUs and 8 CPU nodes\
-✅ Maintains performance across both strong and weak scaling scenarios\
+✅ Maintains performance across both strong and weak scaling scenarios
 
 ## 📚 Reference
 **FOR-QAOA: Fully Optimized Resource-Efficient QAOA Circuit Simulation for Solving the Max-Cut Problems**\
