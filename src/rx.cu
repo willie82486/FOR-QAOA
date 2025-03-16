@@ -71,29 +71,29 @@ __global__ void _multirotateX_unroll(Complex * __restrict__ sv,const Fp cosTheta
 
 
 
-__inline__ __device__ void rx_gate(Complex* sv,const int target,const Fp cosTheta_2,const Fp sinTheta_2)
-{
-    ull tidx = blockIdx.x * blockDim.x + threadIdx.x;
-    ull up_off = bit_string(tidx, target);
-    ull lo_off = up_off + (1ull << target);
+// __inline__ __device__ void rx_gate(Complex* sv,const int target,const Fp cosTheta_2,const Fp sinTheta_2)
+// {
+//     ull tidx = blockIdx.x * blockDim.x + threadIdx.x;
+//     ull up_off = bit_string(tidx, target);
+//     ull lo_off = up_off + (1ull << target);
 
-    Complex up = sv[up_off];
-    Complex lo = sv[lo_off];
+//     Complex up = sv[up_off];
+//     Complex lo = sv[lo_off];
 
-    sv[up_off].real =   up.real * cosTheta_2 + lo.imag * sinTheta_2;
-    sv[up_off].imag =   up.imag * cosTheta_2 - lo.real * sinTheta_2;
-    sv[lo_off].real =   up.imag * sinTheta_2 + lo.real * cosTheta_2;
-    sv[lo_off].imag = - up.real * sinTheta_2 + lo.imag * cosTheta_2;
-}
+//     sv[up_off].real =   up.real * cosTheta_2 + lo.imag * sinTheta_2;
+//     sv[up_off].imag =   up.imag * cosTheta_2 - lo.real * sinTheta_2;
+//     sv[lo_off].real =   up.imag * sinTheta_2 + lo.real * cosTheta_2;
+//     sv[lo_off].imag = - up.real * sinTheta_2 + lo.imag * cosTheta_2;
+// }
 
-__global__
-void _multirotateX(Complex* sv,const Fp cosTheta_2,const Fp sinTheta_2,const  int* targetQubits,const int gate_size)
-{	
-	for(int i = 0; i < gate_size; i++) {
-		rx_gate(sv, targetQubits[i], cosTheta_2, sinTheta_2);
-		__syncthreads();
-	}
-}
+// __global__
+// void _multirotateX(Complex* sv,const Fp cosTheta_2,const Fp sinTheta_2,const  int* targetQubits,const int gate_size)
+// {	
+// 	for(int i = 0; i < gate_size; i++) {
+// 		rx_gate(sv, targetQubits[i], cosTheta_2, sinTheta_2);
+// 		__syncthreads();
+// 	}
+// }
 
 
 void multiRotateX(State& qureg, vector<int> &targetQubits,const int gate_size,const Fp angle) 
@@ -133,53 +133,52 @@ void multiRotateX(State& qureg, vector<int> &targetQubits,const int gate_size,co
 #endif
         return;
     }
-    std::cout << "Jump out of if" << std::endl;
 }
 
-__global__
-void _rotateX(Complex* sv,const Fp cosTheta_2,const Fp sinTheta_2,const int target) 
-{
-    ull tidx = blockIdx.x * blockDim.x + threadIdx.x;
-    ull up_off = bit_string(tidx, target);
-    ull lo_off = up_off + (1ull << target);
+// __global__
+// void _rotateX(Complex* sv,const Fp cosTheta_2,const Fp sinTheta_2,const int target) 
+// {
+//     ull tidx = blockIdx.x * blockDim.x + threadIdx.x;
+//     ull up_off = bit_string(tidx, target);
+//     ull lo_off = up_off + (1ull << target);
 
-    Complex up = sv[up_off];
-    Complex lo = sv[lo_off];
+//     Complex up = sv[up_off];
+//     Complex lo = sv[lo_off];
 
-    sv[up_off].real =   up.real * cosTheta_2 + lo.imag * sinTheta_2;
-    sv[up_off].imag =   up.imag * cosTheta_2 - lo.real * sinTheta_2;
-    sv[lo_off].real =   up.imag * sinTheta_2 + lo.real * cosTheta_2;
-    sv[lo_off].imag = - up.real * sinTheta_2 + lo.imag * cosTheta_2;
-}
+//     sv[up_off].real =   up.real * cosTheta_2 + lo.imag * sinTheta_2;
+//     sv[up_off].imag =   up.imag * cosTheta_2 - lo.real * sinTheta_2;
+//     sv[lo_off].real =   up.imag * sinTheta_2 + lo.real * cosTheta_2;
+//     sv[lo_off].imag = - up.real * sinTheta_2 + lo.imag * cosTheta_2;
+// }
 
 
-void rotateX(const State& qureg,const int targetQubit,const Fp angle) 
-{
-    float sinTheta_2, cosTheta_2;
-    sincos(angle/2, &sinTheta_2, &cosTheta_2);
+// void rotateX(const State& qureg,const int targetQubit,const Fp angle) 
+// {
+//     float sinTheta_2, cosTheta_2;
+//     sincos(angle/2, &sinTheta_2, &cosTheta_2);
 
-    // target qubit is not the most significant bit
-    if (targetQubit < qureg.numQubitsPerDevice) {
-        ull grid = 1;
-        ull block = qureg.numAmpsPerDevice >> 1;
+//     // target qubit is not the most significant bit
+//     if (targetQubit < qureg.numQubitsPerDevice) {
+//         ull grid = 1;
+//         ull block = qureg.numAmpsPerDevice >> 1;
 
-        if (block > 128) {
-            grid = block / 128;
-            block = 128;
-        }
+//         if (block > 128) {
+//             grid = block / 128;
+//             block = 128;
+//         }
 
-        for (int dev = 0; dev < qureg.numDevice; dev++) {
-            checkCudaErrors(cudaSetDevice(dev));
-            _rotateX<<<grid, block>>>(qureg.gpus[dev].dState, cosTheta_2, sinTheta_2, targetQubit);
+//         for (int dev = 0; dev < qureg.numDevice; dev++) {
+//             checkCudaErrors(cudaSetDevice(dev));
+//             _rotateX<<<grid, block>>>(qureg.gpus[dev].dState, cosTheta_2, sinTheta_2, targetQubit);
 
-        }
+//         }
 
-        for (int dev = 0; dev < qureg.numDevice; dev++) {
-            checkCudaErrors(cudaSetDevice(dev));
-            checkCudaErrors(cudaDeviceSynchronize());
-        }
+//         for (int dev = 0; dev < qureg.numDevice; dev++) {
+//             checkCudaErrors(cudaSetDevice(dev));
+//             checkCudaErrors(cudaDeviceSynchronize());
+//         }
 
-        return;
-    }
+//         return;
+//     }
 
-}
+// }
