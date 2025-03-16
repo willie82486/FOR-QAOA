@@ -24,7 +24,7 @@ Run the program with the following command:
  * `<N>`: Number of qubits.
  * `<D>`: Number of devices used for simulation. If you have `N` devices, then `N = 2^D`.
  * `<C>`: Chunk size used as cache-local memory in each compute unit.
- * `<B>`: Buffer size for transferring the state vector across devices. ⚠️The constraint is that B must be ≤ N - D.
+ * `<B>`: Buffer size for transferring the state vector across devices. ⚠️Constraint: `B ≤ N - D`.
 
 📌 Example: 
 ```bash
