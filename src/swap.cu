@@ -7,146 +7,31 @@
 #include <algorithm>
 void CSQS(const State &qureg,  const int csqsSize);
 void CSQS(const State &qureg,  const int csqsSize, char* targ);
-void mapping_after_swap_conti(const State& qureg, Fp* graph,const int SwapOut,const int SwapIn,const int numSwap){
+void mapping_after_swap_conti(const State& qureg, Fp* graph,int SwapOut,int SwapIn,int numSwap){
     assert(SwapIn > SwapOut);
     assert(SwapIn + numSwap -1 <= qureg.numQubits);
     int num = qureg.numQubits;
-    int base_Out = SwapOut * num;
-    int base_In = SwapIn * num;
-    int interval = SwapIn - SwapOut - numSwap ;
-
-    //targ 0 of RZZ belongs to SwapOut and targ1 belongs to SwapIn
-    for(int i = 0; i< SwapOut; i++)
-    {
-        int OutIndex = i * num + SwapOut; 
-        int InIndex = i * num + SwapIn;
-        for(int j = 0; j < numSwap; j++ ){
-            auto tmp = graph[OutIndex+j];
-            graph[OutIndex+j]= graph[InIndex+j];
-            graph[InIndex+j] = tmp;
+    while(numSwap>0){
+        for(int i = 0 ; i < num ;i++){
+            if(i == SwapIn || i == SwapOut)continue;
+            else if(i < SwapOut){
+                std::swap(graph[num * i + SwapIn], graph[num*i+SwapOut]);
+            }
+            else if(i > SwapOut && i < SwapIn){
+                std::swap(graph[num*SwapOut+i], graph[num*i+SwapIn]);
+            }
+            else{
+                std::swap(graph[num * SwapOut+i], graph[num * SwapIn+i]);
+            }
         }
+        numSwap--;
+        SwapIn++;
+        SwapOut++;
     }
 
-
-
-    for(int j = SwapIn + numSwap ; j < num ; j++){
-        for(int i = 0; i < numSwap; i++){
-            auto tmp = graph[base_Out + i*num + j];
-            graph[base_Out+ i*num +j]= graph[base_In+ i*num +j];
-            graph[base_In+ i*num +j] = tmp;         
-        }
-
-    }
-
-    
-    // Both of targ0 and targ1 belongs to the same section(SwapOut or SwapIn)
-    for(int i = 0;i < numSwap;i++)
-    {
-        int offset_swapout = SwapOut + i;
-        int offset_swapin = SwapIn + i;
-        while(offset_swapout < SwapOut + numSwap){
-            auto tmp = graph[base_Out + i * num + offset_swapout];
-            graph[base_Out + i * num + offset_swapout]= graph[base_In + i * num + offset_swapin];
-            graph[base_In + i * num + offset_swapin] = tmp;
-            offset_swapout++;
-            offset_swapin++;
-        }
-    } 
-
-
-    // std::cout<< "interval = "<<interval<<std::endl;
-    int Out = base_Out + SwapOut + numSwap;
-    int In = base_Out + numSwap * num + SwapIn;
-    for(int i = 0; i < interval ; i++)
-    {
-        for(int j = 0; j < numSwap ; j++)
-        {
-            auto tmp = graph[Out + j*num + i];
-            graph[Out + j*num + i] = graph[In + i*num + j];
-            graph[In + i*num + j] = tmp;
-        }
-    }
-    
-    int start = base_Out + SwapIn ;
-    for(int i = 1 ; i< numSwap ;i++){
-        for(int j = 0;j < i ;j++){
-            auto tmp = graph[start + i*num +j];
-            graph[start + i*num +j] = graph[start + i + j*num];
-            graph[start + i + j*num] = tmp;
-        }
-    }
     
 }
-void mapping_after_swap_conti(const State& qureg, ull* graph,const int SwapOut,const int SwapIn,const int numSwap){
-    assert(SwapIn > SwapOut);
-    assert(SwapIn + numSwap -1 <= qureg.numQubits);
-    int num = qureg.numQubits;
-    int base_Out = SwapOut * num;
-    int base_In = SwapIn * num;
-    int interval = SwapIn - SwapOut - numSwap ;
- 
-    //targ 0 of RZZ belongs to SwapOut and targ1 belongs to SwapIn
-    for(int i = 0; i< SwapOut; i++)
-    {
-        int OutIndex = i * num + SwapOut; 
-        int InIndex = i * num + SwapIn;
-        for(int j = 0; j < numSwap; j++ ){
-            auto tmp = graph[OutIndex+j];
-            graph[OutIndex+j]= graph[InIndex+j];
-            graph[InIndex+j] = tmp;
-        }
-    }
 
-
-
-    for(int j = SwapIn + numSwap ; j < num ; j++){
-        for(int i = 0; i < numSwap; i++){
-            auto tmp = graph[base_Out + i*num + j];
-            graph[base_Out+ i*num +j]= graph[base_In+ i*num +j];
-            graph[base_In+ i*num +j] = tmp;         
-        }
-
-    }
-
-    
-    // Both of targ0 and targ1 belongs to the same section(SwapOut or SwapIn)
-    for(int i = 0;i < numSwap;i++)
-    {
-        int offset_swapout = SwapOut + i;
-        int offset_swapin = SwapIn + i;
-        while(offset_swapout < SwapOut + numSwap){
-            auto tmp = graph[base_Out + i * num + offset_swapout];
-            graph[base_Out + i * num + offset_swapout]= graph[base_In + i * num + offset_swapin];
-            graph[base_In + i * num + offset_swapin] = tmp;
-            offset_swapout++;
-            offset_swapin++;
-        }
-    } 
-
-
-    // std::cout<< "interval = "<<interval<<std::endl;
-    int Out = base_Out + SwapOut + numSwap;
-    int In = base_Out + numSwap * num + SwapIn;
-    for(int i = 0; i < interval ; i++)
-    {
-        for(int j = 0; j < numSwap ; j++)
-        {
-            auto tmp = graph[Out + j*num + i];
-            graph[Out + j*num + i] = graph[In + i*num + j];
-            graph[In + i*num + j] = tmp;
-        }
-    }
-    
-    int start = base_Out + SwapIn ;
-    for(int i = 1 ; i< numSwap ;i++){
-        for(int j = 0;j < i ;j++){
-            auto tmp = graph[start + i*num +j];
-            graph[start + i*num +j] = graph[start + i + j*num];
-            graph[start + i + j*num] = tmp;
-        }
-    }
-    
-}
 
 __device__ __forceinline__
 ull bit_string(const ull task, const int targ0, const int targ1)
@@ -170,46 +55,6 @@ long long bit_string_multi(const long long task, const int targ, const int amoun
     return res;
 }
 
-__global__ 
-void _swap_gate(Complex *sv,const int targ0,const int targ1) {//targ0 must less than targ1 
-
-    ull tidx = blockIdx.x * blockDim.x + threadIdx.x;
-    
-	ull idx = bit_string(tidx, targ0, targ1);
-
-    ull off01 = idx + (1ULL<<targ0);
-    ull off10 = idx + (1ULL<<targ1);
-    Complex q01;
-    Complex q10;
-
-	q01 = sv[off01];
-	q10 = sv[off10];
-	sv[off01] = q10;
-	sv[off10] = q01;
-}
-
-void swap_gate(const State& qureg,const int targ0,const int targ1){
-
-        ull grid = 1;
-        ull block = qureg.numAmpsPerDevice >> 2;
-
-        if (block > 512) {
-            grid = block / 512;
-            block = 512;
-        }
-
-        for (int dev = 0; dev < qureg.numDevice; dev++) {
-            checkCudaErrors(cudaSetDevice(dev));
-            _swap_gate<<<grid, block>>>(qureg.gpus[dev].dState, targ0, targ1);
-        }
-        for (int dev = 0; dev < qureg.numDevice; dev++) {
-            checkCudaErrors(cudaSetDevice(dev));
-            checkCudaErrors(cudaDeviceSynchronize());
-        }
-
-        return;
-    
-}
 
 __global__
 void _swap_gate_conti(Complex* sv, const  int swapOut, const int swapIn, const int numSwap, const int* d_table){
