@@ -88,6 +88,7 @@ Tested on:
 ## ❗ Important Warning
 If your `NCCL` version is greater than or equal to `2.19.0`, you can utilize functions like `ncclMemAlloc` and `ncclCommRegister`. Otherwise, please use `cudaMalloc` and `cudaStreamCreate` instead.
 
+The `RANK_PER_NODE` constant in `state.h` may need to be adjusted based on the actual number of ranks per node when the number of ranks running on each node is not the default of 8.
 
 ## 📚 Reference
 **FOR-QAOA: Fully Optimized Resource-Efficient QAOA Circuit Simulation for Solving the Max-Cut Problems**\
