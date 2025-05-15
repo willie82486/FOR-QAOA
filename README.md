@@ -93,4 +93,4 @@ The `RANK_PER_NODE` constant in `state.h` may need to be adjusted based on the a
 ## 📚 Reference
 **FOR-QAOA: Fully Optimized Resource-Efficient QAOA Circuit Simulation for Solving the Max-Cut Problems**\
 PEARC’25 (Practice and Experience in Advanced Research Computing)
-[Paper DOI – TBD]
+[Paper DOI – https://doi.org/10.1145/3708035.3736006]
