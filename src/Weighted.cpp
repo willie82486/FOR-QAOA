@@ -20,6 +20,10 @@
 
 int main(int argc, char* argv[])
 {
+    rx_gate_time_ms = 0.0f;
+    csqs_time_ms = 0.0f;
+    transmission_time_ms = 0.0f;
+
 #if USE_MPI
     // 1. Initialize MPI
     MPI_Init(&argc, &argv);
@@ -28,7 +32,6 @@ int main(int argc, char* argv[])
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
     // if(world_rank == 0)
     //     printf("Total rank: %d \n", world_size);
-
 #endif
     int P;  // number of rounds
     int N;  // number of qubits
@@ -55,7 +58,7 @@ int main(int argc, char* argv[])
     State qureg = createMPIState(N, D, B, C, world_rank, world_size);
 
 #else
-    State qureg = createState(N, D, B, C)
+    State qureg = createState(N, D, B, C);
 
 #endif
 
@@ -113,10 +116,12 @@ int main(int argc, char* argv[])
                 swapIn_index += subcirs[i].size();
                 swap_gate_conti(qureg, 0, swapIn_index, subcirs[i+1].size());
                 mapping_after_swap_conti(qureg, graph, 0, swapIn_index, subcirs[i+1].size());
+                
             }
         }  
     }
     
+    MEASURET_END;
     
     // ==========================================================
     // Synchronize.
@@ -127,9 +132,21 @@ int main(int argc, char* argv[])
         checkCudaErrors(cudaDeviceSynchronize());
     }
 #endif
-    MEASURET_END;
+    
 
-    printf("%10.3f\n", diff / 1000000.0);
+#if USE_MPI
+    if(world_rank == 0){
+        printf("Total simulation time : %10.3f\n", diff / 1000000.0);
+        printf("Total RX time : %f ms\n", rx_gate_time_ms);
+        printf("Total csqs time : %f ms\n", csqs_time_ms);
+        printf("Total transmission time : %f ms\n", transmission_time_ms);
+    }
+#else
+    printf("Total simulation time : %10.6f\n", diff / 1000000.0);
+    printf("Total RX time : %f ms\n", rx_gate_time_ms);
+    
+#endif
+
     fflush(stdout);
     free2DGraph(graph);
 #if USE_MPI

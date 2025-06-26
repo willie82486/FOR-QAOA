@@ -11,7 +11,7 @@
 #include <mpi.h>
 #endif
 
-
+#if USE_MPI
 State createMPIState(int& N, int& D, int& B, int& C, int& world_rank, int& world_size) {
     State qureg;
     qureg.numQubits = N;
@@ -52,9 +52,10 @@ State createMPIState(int& N, int& D, int& B, int& C, int& world_rank, int& world
     // else
     checkCudaErrors(cudaMalloc((void**)&gState.dState, qureg.stateSizePerDevice));
     checkCudaErrors(cudaMalloc((void**)&gState.dBuf, qureg.bufSize));
-    cudaStreamCreate(&(qureg.gpus->compute_stream));
 
 
+    // cudaStreamCreate(&(qureg.gpus->compute_stream));
+    checkCudaErrors(cudaStreamCreateWithFlags(&(qureg.gpus->compute_stream), cudaStreamNonBlocking));
 
     ull stateSize = 1ull << qureg.numQubits;
 
@@ -68,6 +69,7 @@ State createMPIState(int& N, int& D, int& B, int& C, int& world_rank, int& world
     return qureg;
 }
 
+#else
 State createState(int N, int D, int B, int C) {
     State qureg;
     qureg.numQubits = N;
@@ -106,13 +108,13 @@ State createState(int N, int D, int B, int C) {
             // checkCudaErrors(ncclMemAlloc((void **)&gState.dBuf, qureg.bufSize));
             // checkCudaErrors(ncclCommRegister(gState.comm, gState.dBuf, qureg.bufSize, &gState.bufHandle));
 	    // if NCCL_VERSION >= (2,19,0)
-	    checkCudaErrors(ncclMemAlloc((void **)&gState.dState, qureg.stateSizePerDevice));
-	    checkCudaErrors(ncclCommRegister(gState.comm, gState.dState, qureg.stateSizePerDevice, &gState.stateHandle));
-	    checkCudaErrors(ncclMemAlloc((void **)&gState.dBuf, qureg.bufSize));
-	    checkCudaErrors(ncclCommRegister(gState.comm, gState.dBuf, qureg.bufSize, &gState.bufHandle));
+	    // checkCudaErrors(ncclMemAlloc((void **)&gState.dState, qureg.stateSizePerDevice));
+	    // checkCudaErrors(ncclCommRegister(gState.comm, gState.dState, qureg.stateSizePerDevice, &gState.stateHandle));
+	    // checkCudaErrors(ncclMemAlloc((void **)&gState.dBuf, qureg.bufSize));
+	    // checkCudaErrors(ncclCommRegister(gState.comm, gState.dBuf, qureg.bufSize, &gState.bufHandle));
 	    // else
-	    // checkCudaErrors(cudaMalloc((void**)&gState.dState, qureg.stateSizePerDevice));
-	    // checkCudaErrors(cudaMalloc((void**)&gState.dBuf, qureg.bufSize));
+	    checkCudaErrors(cudaMalloc((void**)&gState.dState, qureg.stateSizePerDevice));
+	    checkCudaErrors(cudaMalloc((void**)&gState.dBuf, qureg.bufSize));
         }
         else
         {
@@ -139,6 +141,7 @@ State createState(int N, int D, int B, int C) {
     prepare(qureg, C);
     return qureg;
 }
+#endif
 
 void prepare(State &qureg, int C){
     //rzz

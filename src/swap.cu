@@ -2,6 +2,7 @@
 #include <math.h>
 #include "swap.h"
 #include "state.h"
+#include "utils.h"
 #include "helper_cuda.hpp"
 #include <pthread.h>
 #include <algorithm>
@@ -97,7 +98,22 @@ void swap_gate_conti(const State& qureg, const int SwapOut, const int SwapIn, in
                 for(int i = 0;i< SwapIn + numSwap - qureg.numQubitsPerDevice ;i++){
                     targ[i] = i;
                 }
-                CSQS(qureg, SwapIn + numSwap - qureg.numQubitsPerDevice, targ );
+                
+                cudaEvent_t start_event, end_event;
+                cudaEventCreate(&start_event);
+                cudaEventCreate(&end_event);
+                cudaEventRecord(start_event, qureg.gpus->compute_stream);
+
+                CSQS(qureg, SwapIn + numSwap - qureg.numQubitsPerDevice, targ);
+
+                cudaEventRecord(end_event, qureg.gpus->compute_stream);
+                cudaEventSynchronize(end_event);
+                float milliseconds = 0;
+                cudaEventElapsedTime(&milliseconds, start_event, end_event);
+                csqs_time_ms += milliseconds;
+                cudaEventDestroy(start_event);
+                cudaEventDestroy(end_event);
+
                 swap_gate_conti(qureg, 
                                 qureg.numQubitsPerDevice - SwapIn, 
                                 qureg.numQubitsPerDevice - numQubitOutofDevice, 
@@ -109,7 +125,22 @@ void swap_gate_conti(const State& qureg, const int SwapOut, const int SwapIn, in
                 for(int i = 0;i< numSwap ;i++){
                     targ[i] = SwapIn + i - qureg.numQubitsPerDevice;
                 }
+                
+                cudaEvent_t start_event, end_event;
+                cudaEventCreate(&start_event);
+                cudaEventCreate(&end_event);
+                cudaEventRecord(start_event, qureg.gpus->compute_stream);
+
                 CSQS(qureg, numSwap, targ);
+
+                cudaEventRecord(end_event, qureg.gpus->compute_stream);
+                cudaEventSynchronize(end_event);
+                float milliseconds = 0;
+                cudaEventElapsedTime(&milliseconds, start_event, end_event);
+                csqs_time_ms += milliseconds;
+                cudaEventDestroy(start_event);
+                cudaEventDestroy(end_event);
+
                 swap_gate_conti(qureg, 0, qureg.numQubitsPerDevice - numSwap, numSwap);
                 return;
             }
@@ -205,7 +236,12 @@ void CSQS(const State &qureg,  const int csqsSize, char* targ)
     for (ull off = 0; off < (1ull << (N - D - csqsSize)); off += (1 << (B - csqsSize)))
     {
         for (int grp = 0; grp < (1 << (D - csqsSize)); grp++)
-        {
+        {   
+            cudaEvent_t transmission_start_event, transmission_end_event;
+            cudaEventCreate(&transmission_start_event);
+            cudaEventCreate(&transmission_end_event);
+            cudaEventRecord(transmission_start_event, qureg.gpus->compute_stream);
+
             checkCudaErrors(ncclGroupStart());
             for (int a = 0; a < (1 << csqsSize); a++)
             {
@@ -219,9 +255,10 @@ void CSQS(const State &qureg,  const int csqsSize, char* targ)
                         int devB = devlist[grp][b];
                         int off_sv = b * (1ull << (N - D - csqsSize)) + off;
                         int off_bf = b * (1ull << (B - csqsSize));
-
+                        
                         checkCudaErrors(ncclSend(qureg.gpus->dState + off_sv, (1 << (B - csqsSize)) * sizeof(Complex), ncclChar, devB, qureg.gpus->comm, qureg.gpus->compute_stream)); 
                         checkCudaErrors(ncclRecv(qureg.gpus->dBuf + off_bf, (1 << (B - csqsSize)) * sizeof(Complex), ncclChar, devB, qureg.gpus->comm, qureg.gpus->compute_stream));
+
                     }
                 }
 
@@ -234,7 +271,7 @@ void CSQS(const State &qureg,  const int csqsSize, char* targ)
                     int devB = devlist[grp][b];
                     int off_sv = b * (1ull << (N - D - csqsSize)) + off;
                     int off_bf = b * (1ull << (B - csqsSize));
-
+                    
                     checkCudaErrors(ncclSend(qureg.gpus[devA].dState + off_sv, (1 << (B - csqsSize)) * sizeof(Complex), ncclChar, devB, qureg.gpus[devA].comm, qureg.gpus[devA].compute_stream)); 
                     checkCudaErrors(ncclRecv(qureg.gpus[devA].dBuf + off_bf, (1 << (B - csqsSize)) * sizeof(Complex), ncclChar, devB, qureg.gpus[devA].comm, qureg.gpus[devA].compute_stream));
                 }
@@ -243,7 +280,15 @@ void CSQS(const State &qureg,  const int csqsSize, char* targ)
                 // checkCudaErrors(ncclGroupEnd());
             }
             checkCudaErrors(ncclGroupEnd());
-        }
+
+            cudaEventRecord(transmission_end_event, qureg.gpus->compute_stream);
+            cudaEventSynchronize(transmission_end_event);
+            float milliseconds = 0;
+            cudaEventElapsedTime(&milliseconds, transmission_start_event, transmission_end_event);
+            transmission_time_ms += milliseconds;
+            cudaEventDestroy(transmission_start_event);
+            cudaEventDestroy(transmission_end_event);
+}
 
         for (int grp = 0; grp < (1 << (D - csqsSize)); grp++)
         {

@@ -1,7 +1,7 @@
 import os
 import time
 # os.environ['CUDA_VISIBLE_DEVICES'] = '1'
-outputfile = "output.csv"
+outputfile = "output.log"
 f = open(outputfile, 'w')
 #====================================================================
 # Single GPU
@@ -142,11 +142,13 @@ f = open(outputfile, 'w')
 #====================================================================
 # ChunkTuning
 #====================================================================
-# P = 1
-# C = range(5, 11)
+P = 1
+C = range(5, 13)
 # qubits = range(20, 30)
-# for chunk_size in C:
-#     print("chunk_size :", chunk_size)
-#     for q in qubits:
-#         out_str = f'./weighted {P} {q} {chunk_size}'
-#         os.system(out_str)      
+q = 30
+os.system(f"cd ../../")
+for chunk_size in C:
+    os.system(f"make clean && make -j CHUNK_QUBIT={chunk_size}")
+    print("chunk_size :", chunk_size)
+    out_str = f'./weighted {P} {q} {chunk_size} >> {outputfile}'
+    os.system(out_str)      

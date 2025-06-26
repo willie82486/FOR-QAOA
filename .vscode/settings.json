@@ -64,6 +64,7 @@
         "thread": "cpp",
         "cinttypes": "cpp",
         "bitset": "cpp",
-        "regex": "cpp"
+        "regex": "cpp",
+        "time.h": "c"
     }
 }

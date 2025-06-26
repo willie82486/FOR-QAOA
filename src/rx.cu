@@ -1,7 +1,7 @@
 #include "rx.h"
 #include <iostream>
 #include <math.h>
-
+#include "utils.h"
 #include "state.h"
 #include "helper_cuda.h"
 
@@ -38,8 +38,9 @@ __inline__ __device__ void rx_gate_unroll(Complex* __restrict__ sv, const int ta
 
 
 template<int unrolls, int threads>
-__global__ void _multirotateX_unroll(Complex * __restrict__ sv,const Fp cosTheta_2,const Fp sinTheta_2,const  int* targetQubits, const int gate_size)
+__global__ void _multirotateX_unroll(Complex * __restrict__ sv, const Fp cosTheta_2, const Fp sinTheta_2 ,const  int* targetQubits, const int gate_size)
 {
+	// printf("Running RX_GATE_UNROLL\n");
 	// __shared__ complexArray<1024> sharedBuffer;
     __shared__ Complex sharedBuffer[unrolls*threads];
 	const long long gidx = blockIdx.x * (unrolls*threads);
@@ -70,73 +71,94 @@ __global__ void _multirotateX_unroll(Complex * __restrict__ sv,const Fp cosTheta
 }
 
 
+// Non-unrolled version of the rx_gate function
+// ===============================================================================================================
+__inline__ __device__ void rx_gate(Complex* sv,const int target,const Fp cosTheta_2,const Fp sinTheta_2)
+{
+    ull tidx = blockIdx.x * blockDim.x + threadIdx.x;
+    ull up_off = bit_string(tidx, target);
+    ull lo_off = up_off + (1ull << target);
 
-// __inline__ __device__ void rx_gate(Complex* sv,const int target,const Fp cosTheta_2,const Fp sinTheta_2)
-// {
-//     ull tidx = blockIdx.x * blockDim.x + threadIdx.x;
-//     ull up_off = bit_string(tidx, target);
-//     ull lo_off = up_off + (1ull << target);
+    Complex up = sv[up_off];
+    Complex lo = sv[lo_off];
 
-//     Complex up = sv[up_off];
-//     Complex lo = sv[lo_off];
+    sv[up_off].real =   up.real * cosTheta_2 + lo.imag * sinTheta_2;
+    sv[up_off].imag =   up.imag * cosTheta_2 - lo.real * sinTheta_2;
+    sv[lo_off].real =   up.imag * sinTheta_2 + lo.real * cosTheta_2;
+    sv[lo_off].imag = - up.real * sinTheta_2 + lo.imag * cosTheta_2;
+}
 
-//     sv[up_off].real =   up.real * cosTheta_2 + lo.imag * sinTheta_2;
-//     sv[up_off].imag =   up.imag * cosTheta_2 - lo.real * sinTheta_2;
-//     sv[lo_off].real =   up.imag * sinTheta_2 + lo.real * cosTheta_2;
-//     sv[lo_off].imag = - up.real * sinTheta_2 + lo.imag * cosTheta_2;
-// }
+__global__
+void _multirotateX(Complex* sv, const Fp cosTheta_2, const Fp sinTheta_2, const int* targetQubits, const int gate_size)
+{	
+	// printf("Running RX_GATE_NON-UNROLL\n");
+	for(int i = 0; i < gate_size; i++) {
+		rx_gate(sv, targetQubits[i], cosTheta_2, sinTheta_2);
+		__syncthreads();
+	}
+}
+// ===============================================================================================================
 
-// __global__
-// void _multirotateX(Complex* sv,const Fp cosTheta_2,const Fp sinTheta_2,const  int* targetQubits,const int gate_size)
-// {	
-// 	for(int i = 0; i < gate_size; i++) {
-// 		rx_gate(sv, targetQubits[i], cosTheta_2, sinTheta_2);
-// 		__syncthreads();
-// 	}
-// }
-
-
-void multiRotateX(State& qureg, vector<int> &targetQubits,const int gate_size,const Fp angle) 
+void multiRotateX(State& qureg, vector<int> &targetQubits, const int gate_size, const Fp angle) 
 {
     Fp sinTheta_2, cosTheta_2;
     sincos(angle/2, &sinTheta_2, &cosTheta_2);
 
-    // target qubit is not the most significant bit
-    // if (targetQubit < qureg.numQubitsPerDevice)
-    if (targetQubits[gate_size-1] < qureg.numQubitsPerDevice){
-        const int chunk_size = 1 << CHUNK_QUBIT;
-        const int grid = qureg.numAmpsPerDevice / chunk_size;
-        const int unroll = 8;
-        const int thread = chunk_size / unroll;
+	const int chunk_size = 1 << CHUNK_QUBIT;
+	const int grid = qureg.numAmpsPerDevice / chunk_size;
+	const int unroll = 8;
+	const int thread = chunk_size / unroll;
 #if USE_MPI
-        checkCudaErrors(cudaMemcpyAsync(qureg.gpus->d_subcirs, 
-                                        targetQubits.data(),
-                                        gate_size * sizeof(int), 
-                                        cudaMemcpyHostToDevice,
-                                        qureg.gpus->compute_stream));
-        // checkCudaErrors(cudaMemcpy(qureg.gpus->d_subcirs, 
-        //                                 targetQubits.data(),
-        //                                 gate_size * sizeof(int), 
-        //                                 cudaMemcpyHostToDevice)); 
-        _multirotateX_unroll<unroll, thread><<<grid, thread, 0, qureg.gpus->compute_stream>>>(qureg.gpus->dState, cosTheta_2, sinTheta_2, qureg.gpus->d_subcirs, gate_size);
+	checkCudaErrors(cudaMemcpyAsync(qureg.gpus->d_subcirs, 
+									targetQubits.data(),
+									gate_size * sizeof(int), 
+									cudaMemcpyHostToDevice,
+									qureg.gpus->compute_stream));
+	// checkCudaErrors(cudaMemcpy(qureg.gpus->d_subcirs, 
+	//                                 targetQubits.data(),
+	//                                 gate_size * sizeof(int), 
+	//                                 cudaMemcpyHostToDevice)); 
+	
+
+	cudaEvent_t start_event, end_event;
+	cudaEventCreate(&start_event);
+	cudaEventCreate(&end_event);
+
+	cudaEventRecord(start_event, qureg.gpus->compute_stream);
+
+	_multirotateX_unroll<unroll, thread><<<grid, thread, 0, qureg.gpus->compute_stream>>>(qureg.gpus->dState, cosTheta_2, sinTheta_2, qureg.gpus->d_subcirs, gate_size);
+
+	cudaEventRecord(end_event, qureg.gpus->compute_stream);
+	cudaEventSynchronize(end_event);
+
+	float milliseconds = 0;
+	cudaEventElapsedTime(&milliseconds, start_event, end_event);
+
+	// Add the current RX_GATE execution time to the total
+	rx_gate_time_ms += milliseconds;
+
+	cudaEventDestroy(start_event);
+	cudaEventDestroy(end_event);
+
 
 #else
-        for (int dev = 0; dev < qureg.numDevice; dev++) {
-            checkCudaErrors(cudaSetDevice(dev));
-            checkCudaErrors(cudaMemcpyAsync(qureg.gpus[dev].d_subcirs, 
-                                            targetQubits.data(),
-                                            gate_size * sizeof(int), 
-                                            cudaMemcpyHostToDevice,
-                                            qureg.gpus[dev].compute_stream));
-            _multirotateX_unroll<unroll, thread><<<grid, thread, 0, qureg.gpus[dev].compute_stream>>>(qureg.gpus[dev].dState, cosTheta_2, sinTheta_2, qureg.gpus[dev].d_subcirs, gate_size);
-        }
+	for (int dev = 0; dev < qureg.numDevice; dev++) {
+		checkCudaErrors(cudaSetDevice(dev));
+		checkCudaErrors(cudaMemcpyAsync(qureg.gpus[dev].d_subcirs, 
+										targetQubits.data(),
+										gate_size * sizeof(int), 
+										cudaMemcpyHostToDevice,
+										qureg.gpus[dev].compute_stream));
+		// printf("Running_RX_GATE\n");
+		_multirotateX_unroll<unroll, thread><<<grid, thread, 0, qureg.gpus[dev].compute_stream>>>(qureg.gpus[dev].dState, cosTheta_2, sinTheta_2, qureg.gpus[dev].d_subcirs, gate_size);
+	}
 #endif
-        return;
-    }
+	return;
+
 }
 
 // __global__
-// void _rotateX(Complex* sv,const Fp cosTheta_2,const Fp sinTheta_2,const int target) 
+// void _rotateX(Complex* sv, const Fp cosTheta_2, const Fp sinTheta_2, const int target) 
 // {
 //     ull tidx = blockIdx.x * blockDim.x + threadIdx.x;
 //     ull up_off = bit_string(tidx, target);
@@ -152,7 +174,7 @@ void multiRotateX(State& qureg, vector<int> &targetQubits,const int gate_size,co
 // }
 
 
-// void rotateX(const State& qureg,const int targetQubit,const Fp angle) 
+// void rotateX(const State& qureg, const int targetQubit, const Fp angle) 
 // {
 //     float sinTheta_2, cosTheta_2;
 //     sincos(angle/2, &sinTheta_2, &cosTheta_2);
