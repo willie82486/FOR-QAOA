@@ -13,15 +13,23 @@ cd <repository_directory>
 ```
 
 ### 2. Build
+If build with single node environment, use make without flags:
 ```bash
 make
 ```
-__Note__: In the `makefile`, you might need to adjust the `-arch` flag within `NVCXXFLAGS` to match the architecture of your GPU.
-  
+If build with multi-node environment, use make with USE_MPI=1 flag:
+```bash
+make USE_MPI=1
+```
+If build with avx support, use make with USE_AVX=1 flag:
+```bash
+make USE_AVX=1
+```
+
 ### 3.  Execute the Simulator
 Run the program using the following command:
 ```bash
-./weighted <P> <N> <D> <C> <B>
+./qaoa <P> <N> <D> <C> <B>
 ```
 🧩 Argument Descriptions
  * `<P>`: Circuit depth level (number of QAOA layers).
@@ -32,23 +40,22 @@ Run the program using the following command:
 
 📌 Example: 
 ```bash
-./weighted 5 30 3 12 27
+./qaoa 5 30 3 15 27
 ```
 This runs a 5-level QAOA simulation with:
 
 - 30 qubits,
 - 8 devices (since 2³ = 8),
-- a cache chunk size of 12,
-- and a buffer size of 27 for inter-device communication.
+- a cache chunk size of 15,
+- and a buffer size of 27 for inter-node communication.
 
 ### 🌐 Running on a Multi-Node Environment
-If you're using a distributed setup (e.g., 2 nodes with 8 GPUs each), use mpirun like so:
+To run the simulator in a multi-node environment, ensure that you have MPI installed and configured. Use the following command to execute the simulation across multiple nodes:
+
 ```bash
-mpirun -np 16 -bind-to none --map-by ppr:8:node ./weighted 5 30 4 12 26
+mpirun -np <number_of_processes> -bind-to none --map-by ppr:1:node ./qaoa <P> <N> <D> <C> <B>
 ```
-- `-np 16`: Total number of processes (e.g., 16 GPUs = 2 nodes × 8 GPUs).
-- `--map-by ppr:8:node`: Map 8 processes per node.
-- `4` in the command means `2⁴ = 16` devices.
+Replace `<number_of_processes>` with the total number of processes you want to run, which should be equal to `2^D` (the number of nodes).
 
 ## 🔍 Why Choose FOR-QAOA?
 Classical simulation plays a crucial role in validating the performance of QAOA algorithms in ideal, noise-free conditions. However, simulating the full quantum state becomes computationally expensive and memory-intensive as the number of qubits and the QAOA circuit depth increase. FOR-QAOA addresses these challenges by:
@@ -84,11 +91,6 @@ Tested on:
 ✅ Outperforms Qiskit-Aer, cuQuantum, mpiQulacs, QuEST, and UniQ\
 ✅ Scales efficiently up to 64 GPUs and 8 CPU nodes\
 ✅ Maintains performance across both strong and weak scaling scenarios
-
-## ❗ Important Warning
-If your `NCCL` version is greater than or equal to `2.19.0`, you can utilize functions like `ncclMemAlloc` and `ncclCommRegister`. Otherwise, please use `cudaMalloc` and `cudaStreamCreate` instead.
-
-The `RANK_PER_NODE` constant in `state.h` may need to be adjusted based on the actual number of ranks per node when the number of ranks running on each node is not the default of 8.
 
 ## 📚 Reference
 **FOR-QAOA: Fully Optimized Resource-Efficient QAOA Circuit Simulation for Solving the Max-Cut Problems**\

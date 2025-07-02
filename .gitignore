@@ -6,7 +6,7 @@ testRX.cu
 testRZZ.cu
 *.nsys-rep
 **.d
-
+.vscode/
 .venv
 *.def
 *.csv
