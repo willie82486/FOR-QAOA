@@ -90,7 +90,11 @@ If your `NCCL` version is greater than or equal to `2.19.0`, you can utilize fun
 
 The `RANK_PER_NODE` constant in `state.h` may need to be adjusted based on the actual number of ranks per node when the number of ranks running on each node is not the default of 8.
 
+## 🙏 Acknowlegement
+Special thanks to Yan-Jie Wang for implementing SQS in the CPU version, which significantly reduces the time required for qubit reordering. For more details, please refer to [Queen: A quick,scalable, and comprehensive quantum circuit simulation for supercomputing](https://doi.org/10.48550/arXiv.2406.14084).
+
 ## 📚 Reference
 **FOR-QAOA: Fully Optimized Resource-Efficient QAOA Circuit Simulation for Solving the Max-Cut Problems**\
 PEARC’25 (Practice and Experience in Advanced Research Computing)
 [Paper DOI – https://doi.org/10.1145/3708035.3736006]
+
