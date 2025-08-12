@@ -98,3 +98,5 @@ Special thanks to Yan-Jie Wang for implementing SQS in the CPU version, which si
 PEARC’25 (Practice and Experience in Advanced Research Computing)
 [Paper DOI – https://doi.org/10.1145/3708035.3736006]
 
+## 📜 License
+This project is licensed under the **Apache License 2.0**. See the [LICENSE](LICENSE) file for details.
